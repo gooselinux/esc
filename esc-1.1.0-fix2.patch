@@ -1,0 +1,51 @@
+--- ./esc/src/lib/coolkey/SmartCardMonitoringThread.cpp.fix2	2009-04-18 13:19:20.000000000 -0700
++++ ./esc/src/lib/coolkey/SmartCardMonitoringThread.cpp	2009-04-18 13:20:23.000000000 -0700
+@@ -104,12 +104,16 @@
+     char tBuff[56];
+     PK11SlotInfo *slot;
+ 
++    #ifdef LINUX
++    sleep(3);
++    #endif
++
+     PR_LOG( coolKeyLogSC, PR_LOG_DEBUG, 
+          ("%s SmartCardMonitoringThread::Execute.\n",GetTStamp(tBuff,56)));
+   //
+   // populate token names for already inserted tokens.
+   //
+-    PK11SlotList *sl =
++   /* PK11SlotList *sl =
+ 	PK11_FindSlotsByNames(mModule->dllName, NULL, NULL, PR_TRUE);
+     PK11SlotListElement *sle;
+  
+@@ -123,6 +127,8 @@
+         PK11_FreeSlotList(sl);
+     }
+ 
++   */
++
+   // loop starts..
+     do {
+ 
+--- ./esc/src/app/xul/esc/chrome/content/esc/GenericAuth.xul.fix2	2009-04-18 13:21:34.000000000 -0700
++++ ./esc/src/app/xul/esc/chrome/content/esc/GenericAuth.xul	2009-04-18 13:21:47.000000000 -0700
+@@ -24,7 +24,7 @@
+     id="esc-window"
+     title="&genericAuthTitle;"
+     width="400"
+-    height="225"
++    height="240"
+     onload="UiLoad();"
+     onunload="UiUnload();"
+     xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+--- ./esc/src/app/xul/esc/application.ini.fix2	2009-04-18 13:20:51.000000000 -0700
++++ ./esc/src/app/xul/esc/application.ini	2009-04-18 13:21:02.000000000 -0700
+@@ -25,7 +25,7 @@
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-1
++Version=1.1.0-3
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.

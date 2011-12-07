@@ -1,0 +1,22 @@
+--- ./esc/src/app/xul/esc/chrome/locale/en-US/esc.properties.fix3	2009-04-22 17:44:14.000000000 -0700
++++ ./esc/src/app/xul/esc/chrome/locale/en-US/esc.properties	2009-04-22 17:46:41.000000000 -0700
+@@ -104,7 +104,7 @@
+ errorInvalidTokenTypeParams=The Smart Card Server cannot process the requested type of enrollment due to a misconfiguration.
+ errorCannotPublish=The Smart Card Server cannot publish your card's certificates to the certificate directory.
+ errorCommTokenDB=The Smart Card Server cannot connect to its internal database.
+-errorTokenSuspended=Your smart card has been suspended.
++errorTokenSuspended=You are not allowed to perform this operation with this smart card.
+ errorPinResetable=You are not allowed to reset the password of this smart card.
+ errorConnLost=The Smart Card Manager has lost the connection to the Smart Card Server.
+ errorEntryTokenDB=The Smart Card Server cannot add your smart card to its internal database.
+--- ./esc/src/app/xul/esc/application.ini.fix3	2009-04-22 17:38:49.000000000 -0700
++++ ./esc/src/app/xul/esc/application.ini	2009-04-22 17:39:14.000000000 -0700
+@@ -25,7 +25,7 @@
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-3
++Version=1.1.0-5
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.

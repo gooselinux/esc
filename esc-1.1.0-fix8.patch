@@ -1,0 +1,356 @@
+diff -up ./esc/src/app/xul/esc/application.ini.fix8 ./esc/src/app/xul/esc/application.ini
+--- ./esc/src/app/xul/esc/application.ini.fix8	2010-01-22 14:55:08.252558943 -0800
++++ ./esc/src/app/xul/esc/application.ini	2010-01-22 14:56:58.005888680 -0800
+@@ -25,11 +25,11 @@ Vendor=RedHat
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-9
++Version=1.1.0-14
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.
+-BuildID=0000001011
++BuildID=0000001014
+ ;
+ ; This ID is just an example.  Every XUL app ought to have it's own unique ID.
+ ; You can use the microsoft "guidgen" or "uuidgen" tools, or go on
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/esc.css.fix8 ./esc/src/app/xul/esc/chrome/content/esc/esc.css
+--- ./esc/src/app/xul/esc/chrome/content/esc/esc.css.fix8	2010-01-26 16:42:16.087793028 -0800
++++ ./esc/src/app/xul/esc/chrome/content/esc/esc.css	2010-01-26 16:42:58.995795505 -0800
+@@ -334,6 +334,10 @@ tr [COOLKeyPresent="yes"]{
+    border: black solid 4px;
+ }
+ 
++.BorderedBrowser {
++    border: black solid 4px;
++}
++
+ .SelectedRow {
+ 
+     color: white;
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix8 ./esc/src/app/xul/esc/chrome/content/esc/ESC.js
+--- ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix8	2010-01-21 14:01:01.311558562 -0800
++++ ./esc/src/app/xul/esc/chrome/content/esc/ESC.js	2010-01-26 17:24:02.510792186 -0800
+@@ -29,6 +29,7 @@ var gAdminPage = 0;
+ var gFactoryMode = 0;
+ var gHiddenPage = 0;
+ var gExternalUI = 0;
++var gErrorAlready = 0;
+ 
+ loadStringBundle();
+ 
+@@ -1279,7 +1280,8 @@ function DoShowFullEnrollmentUI()
+    }
+    else
+    {
+-       UpdateEnrollmentArea(keyType,keyID,keyInserted,showFullUI);
++       MyAlert(getBundleString("errorPhoneHomeInfo"));
++       window.close();
+    }
+ }
+ 
+@@ -1792,9 +1794,63 @@ function InitializeEnrollment()
+   UpdateCoolKeyAvailabilityForEnrollment();
+ }
+ 
++function AdminKeyPressHandler(evt)
++{
++  var newitem = null;
++  var olditem = null;
++  var offset  = 0;
++  var selectedIndex = 0;
++
++  var list = document.getElementById("AdminBindingList");
++  if(!list)
++    return;
++
++  var numRows = list.getRowCount();
++  if(numRows == 0)
++  {
++      return;
++  }
++  selectedIndex = list.selectedIndex;
++
++  if(selectedIndex == -1)
++  {
++    olditem = list.getItemAtIndex(0);    
++    if(olditem) {
++      list.selectItem(olditem);
++      olditem.click();
++    }
++  }
++  selectedIndex = list.selectedIndex;
++  olditem = list.getItemAtIndex(selectedIndex);
++
++  if(evt.keyCode == KeyEvent.DOM_VK_UP) {
++   offset = -1;
++  } 
++  if(evt.keyCode == KeyEvent.DOM_VK_DOWN) {
++    offset = 1;
++  }
++
++  if(offset == 0)
++    return;
++
++  if(olditem)  {
++      list.moveByOffset( offset , 1, 0);
++      newitem = list.getItemAtIndex(list.selectedIndex);
++      olditem.blur();
++      if(newitem)
++        newitem.click();
++  }
++}
++
+ function InitializeAdminBindingList()
+ {
+ 
++ var list = document.getElementById("AdminBindingList");
++
++ if(list) {
++   list.addEventListener("keypress", AdminKeyPressHandler, false);
++ }
++
+  gAdminPage = 1;
+ 
+  UpdateAdminBindingListAvailability();
+@@ -1802,6 +1858,7 @@ function InitializeAdminBindingList()
+  DoSetEnrolledBrowserLaunchState(); 
+  DoHandleEnrolledBrowserLaunch();
+ 
++ 
+  window.setTimeout('ShowWindow()',250);
+ 
+ }
+@@ -2332,6 +2389,7 @@ function UpdateAdminKeyDetailsArea(keyTy
+        }
+        else
+        {
++           DisableItem(enrollbtn);
+            DisableItem(resetpinbtn);
+            DisableItem(formatbtn);
+            if(adminkeymenu)
+@@ -2539,6 +2597,8 @@ function CreateAdminListRow(adminListBox
+   listrow.setAttribute("flex","1");
+   listrow.setAttribute("id",KeyToRowID(keyType,keyID));
+ 
++  var listBoxSize = adminListBox.getRowCount();
++
+   var imageCell = InsertListCell(listrow);
+ 
+   if(!imageCell)
+@@ -2762,6 +2822,7 @@ function DoEnrollCoolKey()
+   var tokencode = null;
+   
+   var failed = 0;
++  gErrorAlready = 0;
+ 
+   if (type == "userKey")
+   {
+@@ -2792,12 +2853,13 @@ function DoEnrollCoolKey()
+   {
+      UpdateAdminListRow(keyType,keyID);
+      UpdateAdminKeyDetailsArea(keyType,keyID);
+-     if(!failed)
++     if(!failed && !gErrorAlready)
+      {
+           AdminToggleStatusProgress(1,keyType,keyID);
+           UpdateAdminKeyAreaDetailsLabel(getBundleString("enrollingToken"));
+      }
+   }
++  gErrorAlready = 0;
+ }
+ 
+ function DoCollectPassword(operation)
+@@ -2822,6 +2884,7 @@ function DoResetSelectedCoolKeyPIN()
+   var screennamepwd = null;
+ 
+   var failed = 0;
++  gErrorAlready = 0;
+ 
+   if (GetCoolKeyIsEnrolled(keyType, keyID))
+   {
+@@ -2843,12 +2906,13 @@ function DoResetSelectedCoolKeyPIN()
+      UpdateAdminListRow(keyType,keyID);
+      UpdateAdminKeyDetailsArea(keyType,keyID);
+ 
+-      if(!failed)
++      if(!failed && !gErrorAlready)
+       {
+           AdminToggleStatusProgress(1,keyType,keyID);
+           UpdateAdminKeyAreaDetailsLabel(getBundleString("resettingTokenPIN"));
+       }
+   }
++  gErrorAlready = 0;
+ }
+ 
+ function DoFormatCoolKey(type)
+@@ -2865,6 +2929,7 @@ function DoFormatCoolKey(type)
+   var failed = 0;
+   var globalType = GetCachedTokenType(keyID);
+ 
++  gErrorAlready = 0;
+   if(!type)
+       lType = gKeyEnrollmentType;
+   else
+@@ -2890,12 +2955,13 @@ function DoFormatCoolKey(type)
+   {
+       UpdateAdminListRow(keyType,keyID);
+       UpdateAdminKeyDetailsArea(keyType,keyID);
+-      if(!failed)
++      if(!failed && !gErrorAlready)
+       {
+           AdminToggleStatusProgress(1,keyType,keyID);
+           UpdateAdminKeyAreaDetailsLabel(getBundleString("formatingToken"));
+       }
+   }
++  gErrorAlready = 0;
+ }
+ function DoCancelOperation()
+ {
+@@ -3156,6 +3222,7 @@ function OnCoolKeyStateError(keyType, ke
+      AdminToggleStatusProgress(0,keyType,keyID);
+    }
+ 
++  gErrorAlready = 1;
+   if(!CheckForSecurityMode())
+       MyAlert(typeStr);
+   ClearProgressBar(KeyToProgressBarID(keyType, keyID));
+@@ -3260,10 +3327,73 @@ function refresh()
+   window.resizeBy(0,1);
+   window.resizeBy(0,-1);
+ }
++// nsIWebProgressListener to oversee the loading of the external UI
++var uiListener = null;
++var esc_enroll_uri = null;
++
++const STATE_START = Components.interfaces.nsIWebProgressListener.STATE_START;
++const STATE_STOP = Components.interfaces.nsIWebProgressListener.STATE_STOP;
++const STATE_IS_DOCUMENT = Components.interfaces.nsIWebProgressListener.STATE_IS_DOCUMENT;
++uiListener =
++{
++    QueryInterface: function(aIID)
++    {
++        if (aIID.equals(Components.interfaces.nsIWebProgressListener) ||
++         aIID.equals(Components.interfaces.nsISupportsWeakReference) ||
++         aIID.equals(Components.interfaces.nsISupports))
++         return this;
++         throw Components.results.NS_NOINTERFACE;
++    },
++
++    onStateChange: function(aWebProgress, aRequest, aFlag, aStatus)
++    {
++        if(aFlag & STATE_START && aFlag & STATE_IS_DOCUMENT)
++        {
++        }
++        if(aFlag & STATE_STOP && aFlag & STATE_IS_DOCUMENT)
++        {
++
++            var url = aWebProgress.DOMWindow.document.URL;
++
++            if(url != esc_enroll_uri)
++            {
++                MyAlert(getBundleString("errorEnrollmentUI"));
++
++                if(uiListener)
++                    aWebProgress.removeProgressListener(uiListener);
++
++                var enrollWnd = IsPageWindowPresent(ENROLL_WINDOW);
++
++                if(enrollWnd)
++                {
++                    enrollWnd.close();
++                }
++            }
++            else
++            {
++                if(uiListener)
++                    aWebProgress.removeProgressListener(uiListener);
++            }
++        }
++    },
++
++    onLocationChange: function(aProgress, aRequest, aURI)
++    {
++    },
++    onProgressChange: function(aWebProgress, aRequest, curSelf, maxSelf, curTot, maxTot)
++    {
++    },
++    onStatusChange: function(aWebProgress, aRequest, aStatus, aMessage)
++    {
++    },
++    onSecurityChange: function(aWebProgress, aRequest, aState)
++    {
++    }
++}
+ 
+ function loadExternalESCUI()
+ {
+-   var esc_enroll_uri = null;
++    esc_enroll_uri = null;
+ 
+     var keyType= null;
+     var keyID = null;
+@@ -3285,7 +3415,6 @@ function loadExternalESCUI()
+     }
+ 
+     var esc_enrolled_token_url = null;
+-    var esc_enroll_uri = null;
+ 
+     if(keyID)
+     {
+@@ -3323,8 +3452,10 @@ function loadExternalESCUI()
+ 
+         if(ui_id)
+         {
++            UpdateEnrollmentArea(keyType,keyID,inserted,showFullUI,showExternalUI);
++            ui_id.addProgressListener(uiListener,Components.interfaces.nsIWebProgress.NOTIFY_STATE_DOCUMENT);
+             ui_id.setAttribute("src",esc_enroll_uri);
+-            UpdateEnrollmentArea(keyType,keyID,inserted,showFullUI,showExternalUI)
++
+         }
+ 
+     }
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/esc.xul.fix8 ./esc/src/app/xul/esc/chrome/content/esc/esc.xul
+--- ./esc/src/app/xul/esc/chrome/content/esc/esc.xul.fix8	2010-01-26 16:42:22.991793050 -0800
++++ ./esc/src/app/xul/esc/chrome/content/esc/esc.xul	2010-01-26 16:43:20.964800431 -0800
+@@ -147,7 +147,7 @@
+       </hbox>
+   </vbox>
+ 
+-  <iframe id="esc-ui"  flex="1" class="BorderedIFrame" hidden="true"/>
++  <browser id="esc-ui" class="BorderedBrowser" height="725" flex="1" hidden="true" src="" />
+   </groupbox>
+   <hbox id = "enrollment_button_box">
+         <spacer flex = "4"/>
+diff -up ./esc/src/app/xul/esc/chrome/locale/en-US/esc.properties.fix8 ./esc/src/app/xul/esc/chrome/locale/en-US/esc.properties
+--- ./esc/src/app/xul/esc/chrome/locale/en-US/esc.properties.fix8	2010-01-26 17:25:48.283794316 -0800
++++ ./esc/src/app/xul/esc/chrome/locale/en-US/esc.properties	2010-01-26 17:26:03.157792915 -0800
+@@ -176,6 +176,10 @@ errorSelectKey=Please select a smart car
+ errorEnrolledFirst=Smart card must be enrolled first! Enroll card and try again.
+ enrollmentFor=Enrollment of your 
+ errorNeedKeyForSecMode=Please insert enrolled smart card before attempting secure mode.
++
++errorEnrollmentUI=Problem loading Enrollment UI, check your network connection, re-insert the card, and try again!
++errorPhoneHomeInfo=Problem loading Phone Home Information, check your network connection, re-insert the card, and try again!
++
+ wasSuccessful=was successful.
+ pinResetSuccessful=Password Reset was successfull!
+ formatOf=Format of
+diff -up ./esc/src/lib/coolkey/CoolKey_Message.cpp.fix8 ./esc/src/lib/coolkey/CoolKey_Message.cpp
+--- ./esc/src/lib/coolkey/CoolKey_Message.cpp.fix8	2010-01-26 17:27:35.362792546 -0800
++++ ./esc/src/lib/coolkey/CoolKey_Message.cpp	2010-01-26 17:27:47.565171423 -0800
+@@ -560,7 +560,12 @@ void eCKMessage_LOGIN_RESPONSE::encode(s
+ 
+     string lPassword = getStringValue(pKey);
+ 
+-    aOutputVal += sKey + delim1 + lScreenName + delim + pKey + delim1 + lPassword;
++    string ScreenName_encoded, Password_encoded;
++
++    URLEncode_str(lScreenName, ScreenName_encoded);
++    URLEncode_str(lPassword, Password_encoded);
++
++    aOutputVal += sKey + delim1 + ScreenName_encoded + delim + pKey + delim1 + Password_encoded;
+ 
+     eCKMessage::encode(aOutputVal);
+ }

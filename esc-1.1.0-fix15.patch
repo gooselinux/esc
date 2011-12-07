@@ -1,0 +1,35 @@
+diff -up ./esc/src/app/xul/esc/application.ini.fix15 ./esc/src/app/xul/esc/application.ini
+--- ./esc/src/app/xul/esc/application.ini.fix15	2010-04-23 17:20:05.881535806 -0700
++++ ./esc/src/app/xul/esc/application.ini	2010-04-23 17:20:24.573828139 -0700
+@@ -25,11 +25,11 @@ Vendor=RedHat
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-19
++Version=1.1.0-20
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.
+-BuildID=0000001019
++BuildID=0000001020
+ ;
+ ; This ID is just an example.  Every XUL app ought to have it's own unique ID.
+ ; You can use the microsoft "guidgen" or "uuidgen" tools, or go on
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix15 ./esc/src/app/xul/esc/chrome/content/esc/ESC.js
+--- ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix15	2010-04-21 11:42:08.271271164 -0700
++++ ./esc/src/app/xul/esc/chrome/content/esc/ESC.js	2010-04-21 12:01:58.571353652 -0700
+@@ -2043,7 +2043,13 @@ function SelectESCPage(keyType,keyID,pho
+    var enrollWnd = IsPageWindowPresent(ENROLL_WINDOW);
+    var adminWnd  = IsPageWindowPresent(ADMIN_WINDOW);
+ 
+-   if(keyUninitialized == UNINITIALIZED && !phoneHomeFailed )  //formatted uninitialized card
++   var arr = GetAvailableCoolKeys();
++   var no_launch_external_ui = 0;
++
++    if (arr && arr.length > 1)
++        no_launch_external_ui = 1;
++
++   if(keyUninitialized == UNINITIALIZED && !phoneHomeFailed && !no_launch_external_ui )  //formatted uninitialized card
+    {
+        if(enrollWnd)   //Enrollment window is  already up
+        {

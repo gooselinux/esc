@@ -1,0 +1,29 @@
+diff -up ./esc/src/app/xul/esc/application.ini.fix10 ./esc/src/app/xul/esc/application.ini
+--- ./esc/src/app/xul/esc/application.ini.fix10	2010-03-08 13:32:29.955732878 -0800
++++ ./esc/src/app/xul/esc/application.ini	2010-03-08 13:32:46.049015655 -0800
+@@ -25,11 +25,11 @@ Vendor=RedHat
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-15
++Version=1.1.0-16
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.
+-BuildID=0000001015
++BuildID=0000001016
+ ;
+ ; This ID is just an example.  Every XUL app ought to have it's own unique ID.
+ ; You can use the microsoft "guidgen" or "uuidgen" tools, or go on
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix10 ./esc/src/app/xul/esc/chrome/content/esc/ESC.js
+--- ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix10	2010-03-08 13:33:03.910332032 -0800
++++ ./esc/src/app/xul/esc/chrome/content/esc/ESC.js	2010-03-08 13:34:02.624358429 -0800
+@@ -3453,7 +3453,7 @@ function loadExternalESCUI()
+         if(ui_id)
+         {
+             UpdateEnrollmentArea(keyType,keyID,inserted,showFullUI,showExternalUI);
+-            ui_id.addProgressListener(uiListener,Components.interfaces.nsIWebProgress.NOTIFY_STATE_DOCUMENT);
++            //ui_id.addProgressListener(uiListener,Components.interfaces.nsIWebProgress.NOTIFY_STATE_DOCUMENT);
+             ui_id.setAttribute("src",esc_enroll_uri);
+ 
+         }

@@ -1,0 +1,36 @@
+diff -up ./esc/src/app/xul/esc/application.ini.fix14 ./esc/src/app/xul/esc/application.ini
+--- ./esc/src/app/xul/esc/application.ini.fix14	2010-04-06 14:44:13.209303819 -0700
++++ ./esc/src/app/xul/esc/application.ini	2010-04-06 14:44:29.724576416 -0700
+@@ -25,11 +25,11 @@ Vendor=RedHat
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-18
++Version=1.1.0-19
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.
+-BuildID=0000001018
++BuildID=0000001019
+ ;
+ ; This ID is just an example.  Every XUL app ought to have it's own unique ID.
+ ; You can use the microsoft "guidgen" or "uuidgen" tools, or go on
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix14 ./esc/src/app/xul/esc/chrome/content/esc/ESC.js
+--- ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix14	2010-04-06 14:44:43.957811579 -0700
++++ ./esc/src/app/xul/esc/chrome/content/esc/ESC.js	2010-04-06 14:45:37.633698549 -0700
+@@ -1841,6 +1841,15 @@ function AdminKeyPressHandler(evt)
+       if(newitem) 
+         newitem.click();
+   }
++
++  var item = null;
++  for( i = 0; i < list.getRowCount(); i ++) {
++      item = list.getItemAtIndex(i);
++
++      if(item && item != gCurrentSelectedRow) {
++          item.setAttribute("class","UnSelectedRow");
++      }
++  }
+ }
+ 
+ function InitializeAdminBindingList()

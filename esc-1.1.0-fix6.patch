@@ -1,0 +1,884 @@
+--- ./esc/src/lib/NssHttpClient/engine.h.fix6	2009-06-19 16:07:39.000000000 -0700
++++ ./esc/src/lib/NssHttpClient/engine.h	2009-06-19 16:07:44.000000000 -0700
+@@ -22,9 +22,17 @@
+ #include "response.h"
+ #include "request.h"
+ 
++struct BadCertData {
++ PRErrorCode error;
++ PRInt32 port;
++};
++
++typedef struct BadCertData BadCertData;
++
++
+ class __EXPORT Engine {
+     public:
+-        Engine() {};
++        Engine() { _certData = NULL; _sock=NULL;};
+         ~Engine() {};
+ 
+         PRFileDesc *_doConnect(PRNetAddr *addr, PRBool SSLOn = PR_FALSE,
+@@ -37,7 +45,8 @@
+         static PRIntervalTime globaltimeout;
+ 
+         PRFileDesc *_sock;
+-
++        BadCertData *_certData;
++        BadCertData *getBadCertData() { return _certData;}
+         PRFileDesc *getSocket() { return _sock;}
+ 
+         bool connectionClosed ;
+--- ./esc/src/lib/NssHttpClient/engine.cpp.fix6	2009-06-19 16:07:12.000000000 -0700
++++ ./esc/src/lib/NssHttpClient/engine.cpp	2009-06-19 16:07:29.000000000 -0700
+@@ -16,6 +16,8 @@
+  * All rights reserved.
+  * END COPYRIGHT BLOCK **/
+ 
++#define FORCE_PR_LOG 1
++
+ #include <nspr.h>
+ #include "sslproto.h"
+ #include <prerror.h>
+@@ -27,7 +29,7 @@
+ #include "certt.h"
+ #include "sslerr.h"
+ #include "secerr.h"
+-
++#include "CoolKey.h"
+ #include "engine.h"
+ #include "http.h"
+ 
+@@ -39,6 +41,9 @@
+ int cipherCount = 0;
+ int _doVerifyServerCert = 1;
+ 
++PRLogModuleInfo *httpEngineLog = PR_NewLogModule("coolKeyHttpEngine");
++
++
+ PRIntervalTime Engine::globaltimeout = PR_TicksPerSecond()*30;
+ 
+ /**
+@@ -56,13 +61,26 @@
+     SECStatus    secStatus = SECFailure;
+     PRErrorCode    err;
+ 
++    char tBuff[56];
++
++    PR_LOG(httpEngineLog, PR_LOG_DEBUG,
++                          ("%s myBadCertHandler enter. \n",GetTStamp(tBuff,56)));
++
+     /* log invalid cert here */
+ 
+     if ( !arg ) {
+         return secStatus;
+     }
+ 
+-    *(PRErrorCode *)arg = err = PORT_GetError();
++    err = PORT_GetError();
++
++    BadCertData *data = (BadCertData *) arg;
++    if(data) {
++        data->error = err;
++    }
++
++    PR_LOG(httpEngineLog, PR_LOG_DEBUG,
++                          ("%s myBadCertHandler err: %d .  \n",GetTStamp(tBuff,56),err));
+ 
+     /* If any of the cases in the switch are met, then we will proceed   */
+     /* with the processing of the request anyway. Otherwise, the default */    
+@@ -91,6 +109,10 @@
+     break;
+     }
+ 
++    PR_LOG(httpEngineLog, PR_LOG_DEBUG,
++                          ("%s myBadCertHandler status: %d .  \n",GetTStamp(tBuff,56),secStatus));
++
++
+     return secStatus;
+ }
+ 
+@@ -416,7 +438,6 @@
+     return;
+ }
+ 
+-
+ void Engine::CloseConnection()
+ {
+     connectionClosed = true;
+@@ -426,7 +447,14 @@
+         PR_Close(_sock);
+         _sock = NULL;
+     }
++
++    if(_certData)
++    {
++        delete _certData;
++        _certData = NULL;
++    }
+ }
++
+ /**
+  * Returns a file descriptor for I/O if the HTTP connection is successful
+  * @param addr PRnetAddr structure which points to the server to connect to
+@@ -442,21 +470,19 @@
+     PRFileDesc *tcpsock = NULL;
+     PRFileDesc *sock = NULL;
+     connectionClosed = false;
++    _certData = new BadCertData();
+ 
+     tcpsock = PR_OpenTCPSocket(addr->raw.family);
+-   
+ 
+     if (!tcpsock) {
+-
+         return NULL;
+     }
+ 
+     nodelay(tcpsock);
+ 
+     if (PR_TRUE == SSLOn) {
+-        sock=SSL_ImportFD(NULL, tcpsock);
+-
+ 
++        sock=SSL_ImportFD(NULL, tcpsock);
+         if (!sock) {
+             //xxx log
+             if( tcpsock != NULL ) {
+@@ -516,9 +542,23 @@
+ 
+         PRErrorCode errCode = 0;
+ 
+-        rv = SSL_BadCertHook( sock,
++        if(_certData) {
++            _certData->error = errCode;
++            _certData->port  = PR_ntohs(PR_NetAddrInetPort(addr));
++        }
++
++        CoolKeyBadCertHandler overriddenHandler =  CoolKeyGetBadCertHandler();
++
++        if(overriddenHandler)  {
++            rv = SSL_BadCertHook( sock,
++                              (SSLBadCertHandler)overriddenHandler,
++                               (void *)_certData);
++        } else {
++            rv = SSL_BadCertHook( sock,
+                               (SSLBadCertHandler)myBadCertHandler,
+-                              &errCode );
++                              (void *)_certData);
++        }
++
+         rv = SSL_SetURL( sock, serverName );
+ 
+         if (rv != SECSuccess ) {
+@@ -536,8 +576,6 @@
+         sock = tcpsock;
+     }
+ 
+-  
+-
+     if ( PR_Connect(sock, addr, timeout) == PR_FAILURE ) {
+ 
+         if( sock != NULL ) {
+@@ -563,11 +601,17 @@
+                                           const PSHttpServer& server,
+                                           int timeout, PRBool expectChunked ,PRBool processStreamed) {
+     PRNetAddr addr;
+-    PRFileDesc *sock = NULL;
+     PSHttpResponse *resp = NULL;
+ 
+     PRBool response_code = 0;
+ 
++    char tBuff[56];
++
++    PR_LOG(httpEngineLog, PR_LOG_DEBUG,
++                          ("%s HttpEngine::makeRequest  enter. \n",GetTStamp(tBuff,56)));
++
++
++
+     server.getAddr(&addr);
+ 
+     char *nickName = request.getCertNickName();
+@@ -575,8 +619,17 @@
+     char *serverName = (char *)server.getAddr();
+     _sock = _doConnect( &addr, request.isSSL(), 0, 0,nickName, 0, serverName );
+ 
++    PR_LOG(httpEngineLog, PR_LOG_DEBUG,
++                          ("%s HttpEngine::makeRequest  past doConnect sock: %p. \n",
++                          GetTStamp(tBuff,56),_sock));
++
+     if ( _sock != NULL) {
+         PRBool status = request.send( _sock );
++
++        PR_LOG(httpEngineLog, PR_LOG_DEBUG,
++                          ("%s HttpEngine::makeRequest  past request.send status: %d. \n",
++                          GetTStamp(tBuff,56),status));
++
+         if ( status ) {
+             resp = new PSHttpResponse( _sock, &request, timeout, expectChunked ,this);
+             response_code = resp->processResponse(processStreamed);
+--- ./esc/src/lib/NssHttpClient/manifest.mn.fix6	2009-06-19 16:08:05.000000000 -0700
++++ ./esc/src/lib/NssHttpClient/manifest.mn	2009-06-19 16:08:13.000000000 -0700
+@@ -24,7 +24,7 @@
+ MODULE		= httpchunked
+ LIBRARY_NAME	= $(MODULE)
+ SHARED_NAME	= $(MODULE)
+-REQUIRES	= nss nspr 
++REQUIRES	= nss nspr ckymanager
+ ifndef MOZ_OFFSET
+ MOZ_OFFSET	= mozilla-1.7.13
+ endif
+--- ./esc/src/lib/coolkey/NSSManager.h.fix6	2009-06-19 16:06:41.000000000 -0700
++++ ./esc/src/lib/coolkey/NSSManager.h	2009-06-19 16:06:47.000000000 -0700
+@@ -70,6 +70,8 @@
+ 
+   static HRESULT  GetKeyCertNicknames( const CoolKey *aKey,  vector<string> & aStrings  ); 
+ 
++  static HRESULT GetKeyUID(const CoolKey *aKey, char *aBuf, int aBufLength);
++
+   static HRESULT GetKeyIssuedTo(const CoolKey *aKey, char *aBuf, int aBufLength);
+ 
+   static HRESULT GetKeyIssuer(const CoolKey *aKey, char *aBuf, int aBufLength);
+--- ./esc/src/lib/coolkey/CoolKey.cpp.fix6	2009-06-19 16:02:43.000000000 -0700
++++ ./esc/src/lib/coolkey/CoolKey.cpp	2009-06-19 16:03:03.000000000 -0700
+@@ -259,12 +259,14 @@
+ static CoolKeyRelease g_Release = NULL;
+ static CoolKeyGetConfigValue g_GetConfigValue = NULL;
+ static CoolKeySetConfigValue g_SetConfigValue = NULL;
++static CoolKeyBadCertHandler g_BadCertHandler = NULL;
+ 
+ char* CoolKeyVerifyPassword(PK11SlotInfo *,PRBool,void *);
+ 
+ COOLKEY_API HRESULT CoolKeySetCallbacks(CoolKeyDispatch dispatch,
+ 	CoolKeyReference reference, CoolKeyRelease release,
+-        CoolKeyGetConfigValue getconfigvalue,CoolKeySetConfigValue setconfigvalue)
++        CoolKeyGetConfigValue getconfigvalue,CoolKeySetConfigValue setconfigvalue,
++        CoolKeyBadCertHandler badcerthandler)
+ {
+     char tBuff[56];
+     g_Dispatch = dispatch;
+@@ -272,6 +274,7 @@
+     g_Release = release;
+     g_GetConfigValue = getconfigvalue;
+     g_SetConfigValue = setconfigvalue;
++    g_BadCertHandler = badcerthandler;
+ 
+     char * suppressPINPrompt =(char*) CoolKeyGetConfig("esc.security.url");
+ 
+@@ -997,6 +1000,16 @@
+   
+     return NSSManager::GetKeyPolicy(aKey, aBuf, aBufLen);
+ }
++
++HRESULT
++CoolKeyGetUID(const CoolKey *aKey, char *aBuf, int aBufLength)
++{
++    if (!aKey || !aKey->mKeyID || !aBuf || aBufLength < 1)
++        return E_FAIL;
++
++    return NSSManager::GetKeyUID(aKey,aBuf,aBufLength);
++}
++
+ HRESULT
+ CoolKeyGetIssuedTo(const CoolKey *aKey, char *aBuf, int aBufLength)
+ {
+@@ -1290,6 +1303,13 @@
+     return aCUID;
+ }
+ 
++CoolKeyBadCertHandler CoolKeyGetBadCertHandler()
++{
++    if(g_BadCertHandler)
++        return g_BadCertHandler;
++    return NULL;
++}
++
+ const char *CoolKeyGetConfig(const char *aValue)
+ {
+     if(!g_GetConfigValue || ! aValue)
+--- ./esc/src/lib/coolkey/manifest.mn.fix6	2009-06-19 16:05:45.000000000 -0700
++++ ./esc/src/lib/coolkey/manifest.mn	2009-06-19 16:05:54.000000000 -0700
+@@ -19,7 +19,6 @@
+ 
+ XULRUNNER_BASE=$(CORE_DEPTH)/dist/$(OBJDIR)//xulrunner_build
+ 
+-
+ SYS_INC		= /usr/include
+ MODULE		= ckymanager
+ LIBRARY_NAME	= $(MODULE)
+@@ -41,7 +40,7 @@
+ 		SmartCardMonitoringThread.cpp \
+ 		$(NULL)
+ 
+-EXPORTS 	= \
++EXPORTS		= \
+ 		CoolKey.h \
+ 		$(NULL)
+ 
+--- ./esc/src/lib/coolkey/NSSManager.cpp.fix6	2009-06-19 16:06:19.000000000 -0700
++++ ./esc/src/lib/coolkey/NSSManager.cpp	2009-06-19 16:06:28.000000000 -0700
+@@ -369,7 +369,7 @@
+ 
+     aBuf[0]=0;
+ 
+-    PR_LOG( coolKeyLogNSS, PR_LOG_DEBUG, ("%s NSSManager::GetKeyIssuedTo \n",GetTStamp(tBuff,56)));
++    PR_LOG( coolKeyLogNSS, PR_LOG_DEBUG, ("%s NSSManager::GetKeyIssuer \n",GetTStamp(tBuff,56)));
+ 
+     if(!aKey )
+         return E_FAIL;
+@@ -409,7 +409,7 @@
+                         continue;
+                     }
+                     orgID    = CERT_GetOrgName(&cert->subject);
+-                    PR_LOG( coolKeyLogNSS, PR_LOG_DEBUG, ("%s NSSManager::GetKeyIssuedTo ourSlot %p curSlot  %p org %s \n",GetTStamp(tBuff,56),slot,cert->slot,orgID));
++                    PR_LOG( coolKeyLogNSS, PR_LOG_DEBUG, ("%s NSSManager::GetKeyIssuer ourSlot %p curSlot  %p org %s \n",GetTStamp(tBuff,56),slot,cert->slot,orgID));
+ 
+                 }
+ 
+@@ -437,6 +437,85 @@
+     return S_OK;
+ }
+ 
++HRESULT NSSManager::GetKeyUID(const CoolKey *aKey, char *aBuf, int aBufLength)
++{
++    char tBuff[56];
++    if(!aBuf)
++        return E_FAIL;
++
++    aBuf[0]=0;
++
++    PR_LOG( coolKeyLogNSS, PR_LOG_DEBUG, ("%s NSSManager::GetKeyUID \n",GetTStamp(tBuff,56)));
++
++    if(!aKey )
++        return E_FAIL;
++
++    PK11SlotInfo *slot = GetSlotForKeyID(aKey);
++
++    if (!slot)
++        return E_FAIL;
++
++    CERTCertList *certs = PK11_ListCerts(PK11CertListAll,NULL);
++
++    if (!certs)
++    {
++        PR_LOG( coolKeyLogNSS, PR_LOG_DEBUG, ("%sNSSManager::GetKeyUID no certs found! \n",GetTStamp(tBuff,56)));
++        PK11_FreeSlot(slot);
++        return E_FAIL;
++    }
++
++    CERTCertListNode *node= NULL;
++
++    char *certID = NULL;
++
++    for( node = CERT_LIST_HEAD(certs);
++             ! CERT_LIST_END(node, certs);
++             node = CERT_LIST_NEXT(node))     
++    {     
++        if(node->cert) 
++        {
++            CERTCertificate *cert = node->cert;
++
++            if(cert)
++            {
++                if(cert->slot == slot)
++                {
++                    if(IsCACert(cert))
++                    {
++                        continue;
++                    }
++
++                    certID = CERT_GetCertUid(&cert->subject);
++
++                    PR_LOG( coolKeyLogNSS, PR_LOG_DEBUG, ("%s NSSManager::GetKeyUID ourSlot %p curSlot  %p certID %s  \n",GetTStamp(tBuff,56),slot,cert->slot,certID));
++           
++                }
++
++                if(certID)
++                    break;
++            }
++        }
++
++    }
++
++    if(certID && ((int)strlen(certID)  <  aBufLength))
++    {
++        strcpy(aBuf,certID);
++    }
++
++    if(certs)
++      CERT_DestroyCertList(certs);
++
++    if(slot)
++      PK11_FreeSlot(slot);
++
++    if(certID)
++        PORT_Free(certID);
++
++    return S_OK;
++}
++
++
+ HRESULT NSSManager::GetKeyIssuedTo(const CoolKey *aKey, char *aBuf, int aBufLength)
+ {
+     char tBuff[56];
+@@ -487,6 +566,10 @@
+ 
+                     certID = CERT_GetCommonName(&cert->subject);
+ 
++                    if(!certID) {
++                        certID = CERT_GetCertUid(&cert->subject);
++                    }
++
+                     PR_LOG( coolKeyLogNSS, PR_LOG_DEBUG, ("%s NSSManager::GetKeyIssuedTo ourSlot %p curSlot  %p certID %s  \n",GetTStamp(tBuff,56),slot,cert->slot,certID));
+ 
+                 }
+--- ./esc/src/lib/coolkey/CoolKey.h.fix6	2009-06-19 16:04:59.000000000 -0700
++++ ./esc/src/lib/coolkey/CoolKey.h	2009-06-19 16:05:05.000000000 -0700
+@@ -26,6 +26,7 @@
+ // platforms (coreconf will do the appropriate processing.
+ #define COOLKEY_API
+ 
++#include "ssl.h"
+ #include <string.h>
+ #include <stdlib.h>
+ #include <vector>
+@@ -100,7 +101,7 @@
+ 
+ typedef HRESULT (*CoolKeySetConfigValue)(const char *name,const char *value);
+ typedef const char * (*CoolKeyGetConfigValue)(const char *name);
+-
++typedef SECStatus (*CoolKeyBadCertHandler)(void *arg, PRFileDesc *fd);
+ 
+ 
+ extern "C" {
+@@ -112,7 +113,8 @@
+ COOLKEY_API HRESULT CoolKeyUnregisterListener(CoolKeyListener* aListener);
+ COOLKEY_API HRESULT CoolKeySetCallbacks(CoolKeyDispatch dispatch,
+                         CoolKeyReference reference, CoolKeyRelease release,
+-                        CoolKeyGetConfigValue getconfigvalue,CoolKeySetConfigValue setconfigvalue);
++                        CoolKeyGetConfigValue getconfigvalue,CoolKeySetConfigValue setconfigvalue,
++                        CoolKeyBadCertHandler badcerthandler=NULL);
+ 
+ COOLKEY_API bool    CoolKeyRequiresAuthentication(const CoolKey *aKey);
+ COOLKEY_API bool    CoolKeyHasApplet(const CoolKey *aKey);
+@@ -133,6 +135,8 @@
+ 
+ COOLKEY_API HRESULT CoolKeyGetCertInfo(const CoolKey *aKey, char *aCertNickname, std::string & aCertInfo);
+ 
++COOLKEY_API HRESULT CoolKeyGetUID(const CoolKey *aKey, char *aBuf, int aBufLength);
++
+ COOLKEY_API HRESULT CoolKeyGetIssuedTo(const CoolKey *aKey, char *aBuf, int aBufLength);
+ COOLKEY_API HRESULT CoolKeyGetIssuer(const CoolKey *aKey, char *aBuf, int aBufLength);
+ 
+@@ -257,6 +261,9 @@
+ 
+ const char *CoolKeyGetConfig(const char *aName);
+ HRESULT     CoolKeySetConfig(const char *aName,const char *aValue);
++CoolKeyBadCertHandler CoolKeyGetBadCertHandler();
++
++
+ 
+ }
+ 
+--- ./esc/src/lib/coolkey/Makefile.fix6	2009-06-19 16:05:24.000000000 -0700
++++ ./esc/src/lib/coolkey/Makefile	2009-06-19 16:05:32.000000000 -0700
+@@ -35,6 +35,9 @@
+ 	echo "Build Linux or Windows."
+ 	make -f common.mk
+ 
++export::
++	make -f common.mk export
++
+ endif
+ 
+ ifeq ($(OS_ARCH),Darwin)
+--- ./esc/src/app/xul/esc/chrome/content/esc/certManager.xul.fix6	2009-06-19 16:01:21.000000000 -0700
++++ ./esc/src/app/xul/esc/chrome/content/esc/certManager.xul	2009-06-19 16:01:43.000000000 -0700
+@@ -65,7 +65,7 @@
+       <tabs id="certMgrTabbox" onselect="CertsTabsSelected();">
+         <tab id="mine_tab" label="&certmgr.tab.mine;" selected="true"/>
+         <tab id="others_tab" hidden="true" label="&certmgr.tab.others2;"/>
+-        <tab id="websites_tab" hidden="true" label="&certmgr.tab.websites3;"/>
++        <tab id="websites_tab" hidden="false" label="&certmgr.tab.websites3;"/>
+         <tab id="ca_tab" hidden="false" label="&certmgr.tab.ca;"/>
+         <tab id="orphan_tab" hidden="true" label="&certmgr.tab.orphan2;"/>
+ 
+--- ./esc/src/app/xpcom/rhCoolKey.cpp.fix6	2009-06-19 15:56:20.000000000 -0700
++++ ./esc/src/app/xpcom/rhCoolKey.cpp	2009-06-19 15:57:48.000000000 -0700
+@@ -30,7 +30,7 @@
+ #else
+ #include "nsServiceManagerUtils.h"
+ #endif
+-
++#include "pipnss/nsICertOverrideService.h"
+ #include "nsIPrefBranch.h"
+ #include "nsIPrefService.h"
+ #include "nsCOMPtr.h"
+@@ -69,6 +69,7 @@
+ #endif
+ 
+ #define PSM_COMPONENT_CONTRACTID "@mozilla.org/psm;1"
++#define NS_CERTOVERRIDE_CONTRACTID "@mozilla.org/security/certoverride;1"
+ 
+ static const nsIID kIModuleIID = NS_IMODULE_IID;
+ static const nsIID kIFactoryIID = NS_IFACTORY_IID;
+@@ -89,6 +90,7 @@
+ 
+ std::list< nsCOMPtr <rhIKeyNotify>  > rhCoolKey::gNotifyListeners;
+ 
++PRLock* rhCoolKey::certCBLock=NULL;
+ 
+ PRBool rhCoolKey::gAutoEnrollBlankTokens = PR_FALSE; 
+ 
+@@ -190,6 +192,13 @@
+         mCSPListener = nsnull;
+     #endif
+ 
++    certCBLock = PR_NewLock();
++
++    if(!certCBLock) {
++       PR_LOG( coolKeyLog, PR_LOG_ERROR, ("%s Failed to create lock exiting! \n",GetTStamp(tBuff,56)));
++        exit(1);
++    }
++
+     PRBool res = InitInstance();
+ 
+     if(res == PR_FALSE)
+@@ -207,6 +216,10 @@
+ 
+     char tBuff[56];
+     PR_LOG( coolKeyLog, PR_LOG_DEBUG, ("%s rhCoolKey::~rhCoolKey: %p \n",GetTStamp(tBuff,56),this));
++
++    if(certCBLock) {
++        PR_DestroyLock(certCBLock);
++    }
+ }
+ 
+ void rhCoolKey::ShutDownInstance()
+@@ -255,6 +268,212 @@
+     return S_OK;
+ }
+ 
++struct BadCertData {
++     PRErrorCode error; 
++     PRInt32 port;
++};  
++
++typedef struct BadCertData BadCertData;
++
++SECStatus rhCoolKey::badCertHandler(void *arg, PRFileDesc *fd)
++{
++    SECStatus    secStatus = SECFailure;
++    PRErrorCode    err;
++    char *host = NULL;
++    PRInt32 port = 0;
++    CERTCertificate *serverCert = NULL;
++    PRUint32 errorBits = 0;
++    char tBuff[56];
++    
++    PR_Lock(certCBLock);
++
++    if (!arg || !fd) {
++        PR_Unlock(certCBLock);
++        return secStatus;
++    }
++
++    // Retrieve callback data from NssHttpClient
++    // Caller cleans up this data
++    BadCertData *data = (BadCertData *) arg;
++    data->error = err = PORT_GetError();
++
++
++    /* If any of the cases in the switch are met, then we will proceed   */
++
++    switch (err) {
++    case SEC_ERROR_INVALID_AVA:
++    case SEC_ERROR_INVALID_TIME:
++    case SEC_ERROR_BAD_SIGNATURE:
++    case SEC_ERROR_EXPIRED_CERTIFICATE:
++    case SEC_ERROR_UNKNOWN_ISSUER:
++    case SEC_ERROR_UNTRUSTED_CERT:
++    case SEC_ERROR_CERT_VALID:
++    case SEC_ERROR_EXPIRED_ISSUER_CERTIFICATE:
++    case SEC_ERROR_CRL_EXPIRED:
++    case SEC_ERROR_CRL_BAD_SIGNATURE:
++    case SEC_ERROR_EXTENSION_VALUE_INVALID:
++    case SEC_ERROR_CA_CERT_INVALID:
++    case SEC_ERROR_CERT_USAGES_INVALID:
++    case SEC_ERROR_UNKNOWN_CRITICAL_EXTENSION:
++    case SEC_ERROR_EXTENSION_NOT_FOUND: // Added by Rob 5/21/2002
++        secStatus = SECSuccess;
++    break;
++    default:
++        secStatus = SECFailure;
++    break;
++    }
++
++    if(secStatus == SECSuccess)  {
++        PR_Unlock(certCBLock);
++        return secStatus;
++    }
++
++    // Collect errors to compare with override service output
++    switch(err) {
++    case SEC_ERROR_UNTRUSTED_ISSUER:
++        errorBits |= nsICertOverrideService::ERROR_UNTRUSTED;
++    break;
++    case SSL_ERROR_BAD_CERT_DOMAIN:
++        errorBits |= nsICertOverrideService::ERROR_MISMATCH;
++    break;
++    case SEC_ERROR_EXPIRED_CERTIFICATE:
++        errorBits |= nsICertOverrideService::ERROR_TIME;
++    default:
++    break;
++    };
++
++    // Now proceed to see if we have an exception.
++    // Get the server certificate that was rejected.
++    serverCert = SSL_PeerCertificate(fd);
++
++    if(!serverCert) {
++        PR_Unlock(certCBLock);
++        return secStatus;
++    }
++
++    port = data->port;
++    host = SSL_RevealURL(fd);
++
++    if(!host || port <= 0) {
++        PR_Unlock(certCBLock);
++        return secStatus;
++    }
++
++    PR_LOG(coolKeyLog, PR_LOG_DEBUG,
++                          ("%s rhCoolKey::badCertHandler enter: error: %d  url: %s port: %d \n",
++                          GetTStamp(tBuff,56),err,host,port)
++    );
++
++    PRBool isTemporaryOverride = PR_FALSE;
++    PRUint32 overrideBits = 0;
++    PRBool overrideResult = PR_FALSE;
++
++    // Use the nsICertOverrideService to see if we have
++    // previously trusted this certificate.
++    nsCOMPtr<nsICertOverrideService> overrideService =
++       do_GetService(NS_CERTOVERRIDE_CONTRACTID);
++
++    const nsEmbedCString nsHost(host);
++    nsEmbedCString hashAlg,fingerPrint;
++
++    nsresult nsrv;
++    unsigned char* fingerprint=NULL;
++    if(overrideService) {
++        nsrv = overrideService->GetValidityOverride((const nsACString &)nsHost,
++            port,(nsACString &)hashAlg,
++            (nsACString&)fingerPrint,&overrideBits,
++            &isTemporaryOverride,&overrideResult
++        );
++        if(nsrv == NS_OK) { 
++           PR_LOG(coolKeyLog, PR_LOG_DEBUG,
++               ("%s rhCoolKey::badCertHandler res %d print %s len %d bits %u temp %d alg: %s  \n",
++               GetTStamp(tBuff,56),overrideResult,fingerPrint.get(),
++               fingerPrint.Length(),overrideBits, isTemporaryOverride,hashAlg.get())
++           );
++       }
++
++       PRBool certMatches = PR_FALSE;
++
++       if( (nsrv == NS_OK) && overrideResult) {
++            SECItem oid;
++            oid.data = nsnull;
++            oid.len = 0;
++            SECStatus srv = SEC_StringToOID(nsnull, &oid,
++                    hashAlg.get(), hashAlg.Length());
++
++            if (srv != SECSuccess)  {
++               PR_Free(host);
++               host=NULL;
++               CERT_DestroyCertificate(serverCert);
++               serverCert=NULL;
++               PR_Unlock(certCBLock);
++               return secStatus;
++            }
++
++            SECOidTag oid_tag = SECOID_FindOIDTag(&oid);
++
++            unsigned int hash_len = HASH_ResultLenByOidTag(oid_tag);
++            fingerprint = new unsigned char[hash_len];
++
++            if(!fingerprint)  {
++                CERT_DestroyCertificate(serverCert);
++                serverCert=NULL;
++                PR_Unlock(certCBLock);
++                return secStatus;
++            }
++
++            SECItem computedPrint;
++            memset(fingerprint, 0, sizeof fingerprint);
++            PK11_HashBuf(oid_tag, fingerprint,
++            serverCert->derCert.data, serverCert->derCert.len);
++            CERT_DestroyCertificate(serverCert);
++            serverCert=NULL;
++
++            computedPrint.data=fingerprint;
++            computedPrint.len=hash_len;
++
++            char *formattedPrint = CERT_Hexify(&computedPrint,1);
++            char *inputPrint = (char *)fingerPrint.get();
++
++            //Compare fingerprints.
++
++            if(formattedPrint && inputPrint)  {
++                if(!PL_strcmp(formattedPrint, inputPrint))
++                    certMatches = PR_TRUE;
++            }
++            PR_LOG( coolKeyLog, PR_LOG_DEBUG, ("%s certMatches: %d  \n",
++                GetTStamp(tBuff,56),certMatches)
++            );
++
++            if(formattedPrint)  {
++                PORT_Free(formattedPrint);
++                formattedPrint = NULL;
++            }
++      } else {
++          PR_LOG( coolKeyLog, PR_LOG_DEBUG, ("%s override test failed. \n",
++              GetTStamp(tBuff,56))
++          );
++      }
++
++      if( certMatches ) {
++         if(overrideBits | errorBits)
++             secStatus = SECSuccess;   
++      }
++    }
++
++    PR_Free(host);
++    host = NULL;
++    if(fingerprint)  {
++        delete [] fingerprint;
++        fingerprint = NULL;
++    }
++
++    PR_Unlock(certCBLock);
++
++    return secStatus;
++}
++
++
+ HRESULT rhCoolKey::doSetCoolKeyConfigValue(const char *aName, const char *aValue) 
+ {
+ 
+@@ -340,7 +559,7 @@
+     nssComponent
+     = do_GetService(PSM_COMPONENT_CONTRACTID); 
+ 
+-    CoolKeySetCallbacks(Dispatch,Reference, Release,doGetCoolKeyConfigValue ,doSetCoolKeyConfigValue);
++    CoolKeySetCallbacks(Dispatch,Reference, Release,doGetCoolKeyConfigValue ,doSetCoolKeyConfigValue,badCertHandler);
+ 
+     mProxy = CreateProxyObject();
+ 
+@@ -1262,6 +1481,38 @@
+ }
+ 
+ /* string GetCoolKeyIssuedTo (in unsigned long aKeyType, in string aKeyID); */
++NS_IMETHODIMP rhCoolKey::GetCoolKeyUID(PRUint32 aKeyType, const char *aKeyID, char **uid)
++{
++    char tBuff[56];
++    if (!aKeyID) {
++        return NS_ERROR_FAILURE;
++    }
++
++    AutoCoolKey key(aKeyType, ( char *)aKeyID);
++
++    char buff[512];
++    int bufLength = 512;
++    buff[0] = 0;
++   
++    CoolKeyGetUID(&key, (char *) buff, bufLength);
++
++    if(!buff[0])
++    {
++        return NS_OK;
++    }
++
++    PR_LOG(coolKeyLog,PR_LOG_DEBUG,("%s rhCoolKey::RhGetCoolKeyGetUID  %s \n",GetTStamp(tBuff,56),(char *) buff));
++
++    char *temp =  (char *) nsMemory::Clone(buff,sizeof(char) * strlen(buff) + 1);
++
++    *uid = temp;
++
++    return NS_OK;
++
++}
++
++
++/* string GetCoolKeyIssuedTo (in unsigned long aKeyType, in string aKeyID); */
+ NS_IMETHODIMP rhCoolKey::GetCoolKeyIssuedTo(PRUint32 aKeyType, const char *aKeyID, char **issuedTo)
+ {
+     char tBuff[56];
+--- ./esc/src/app/xpcom/rhICoolKey.idl.fix6	2009-06-19 16:00:20.000000000 -0700
++++ ./esc/src/app/xpcom/rhICoolKey.idl	2009-06-19 16:00:32.000000000 -0700
+@@ -66,6 +66,8 @@
+ 
+     string GetCoolKeyCertInfo(in unsigned long aKeyType, in string aKeyID, in string aCertNickname);
+ 
++    string GetCoolKeyUID(in unsigned long aKeyType, in string aKeyID);
++
+     string GetCoolKeyIssuedTo(in unsigned long aKeyType, in string aKeyID);
+    
+     string GetCoolKeyIssuer(in unsigned long aKeyType, in string aKeyID);
+--- ./esc/src/app/xpcom/Makefile.sdk.fix6	2009-06-19 15:54:52.000000000 -0700
++++ ./esc/src/app/xpcom/Makefile.sdk	2009-06-19 15:55:43.000000000 -0700
+@@ -109,7 +109,7 @@
+ CPPFLAGS += -fno-rtti \
+                 -fno-exceptions \
+                 -fshort-wchar -fPIC
+-GECKO_LD_LIBS=-L$(GECKO_SDK_PATH)/lib    $(GECKO_SDK_PATH)/lib/libxpcomglue.a -lnss3 -lcrmf -lssl3 -lsmime3 -lplds4 -lplc4 -lnspr4 -lpthread -ldl
++GECKO_LD_LIBS=-L$(GECKO_SDK_PATH)/lib    $(GECKO_SDK_PATH)/lib/libxpcomglue.a -lnssutil3 -lnss3 -lcrmf -lssl3 -lsmime3 -lplds4 -lplc4 -lnspr4 -lpthread -ldl
+ endif
+ 
+ ifeq ($(OS_ARCH),WINNT)
+@@ -145,7 +145,7 @@
+ GECKO_INCLUDES		+= -I $(GECKO_SDK_PATH)/sdk/include
+ OBJECT			= rhCoolKey.obj
+ OBJECTCSP		= CoolKeyCSP.obj 
+-COOL_LDFLAGS		=   -IMPLIB:fake-import /LIBPATH:$(CORE_DIST)/lib ckymanager.lib httpchunked.lib $(GECKO_LD_LIBS) nss3.lib ssl3.lib smime3.lib softokn3.lib  /LIBPATH:$(CKY_LIB_LDD) libckyapplet.lib  crypt32.lib kernel32.lib user32.lib gdi32.lib winmm.lib wsock32.lib advapi32.lib /NODEFAULTLIB:libc.lib
++COOL_LDFLAGS		=   -IMPLIB:fake-import /LIBPATH:$(CORE_DIST)/lib ckymanager.lib httpchunked.lib $(GECKO_LD_LIBS) nssutil3.lib nss3.lib ssl3.lib smime3.lib softokn3.lib  /LIBPATH:$(CKY_LIB_LDD) libckyapplet.lib  crypt32.lib kernel32.lib user32.lib gdi32.lib winmm.lib wsock32.lib advapi32.lib /NODEFAULTLIB:libc.lib
+ endif
+ 
+ ifeq ($(OS_ARCH),Darwin)
+--- ./esc/src/app/xpcom/rhCoolKey.h.fix6	2009-06-19 15:58:21.000000000 -0700
++++ ./esc/src/app/xpcom/rhCoolKey.h	2009-06-19 15:58:28.000000000 -0700
+@@ -22,6 +22,15 @@
+ #include "nsIGenericFactory.h"
+ #include "nsEmbedString.h"
+ #include <list>
++#include "nspr.h"
++#include "prio.h"
++#include "ssl.h"
++#include "pk11func.h"
++#include "cert.h"
++#include "sslerr.h"
++#include "secerr.h"
++#include "sechash.h"
++
+ #include "CoolKey.h"
+ #include "nsCOMPtr.h"
+ #include "nsIObserver.h"
+@@ -92,6 +101,7 @@
+ 
+     static HRESULT doSetCoolKeyConfigValue(const char *aName, const char *aValue); 
+     static const char *doGetCoolKeyConfigValue(const char *aName );
++    static SECStatus badCertHandler(void *arg, PRFileDesc *fd);
+ 
+ protected:
+   /* additional members */
+@@ -107,6 +117,8 @@
+ 
+     static std::list< nsCOMPtr <rhIKeyNotify> > gNotifyListeners;
+ 
++    static PRLock* certCBLock;
++
+     rhICoolKey* mProxy;
+ 
+     static PRBool      gAutoEnrollBlankTokens;

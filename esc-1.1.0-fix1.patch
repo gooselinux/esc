@@ -1,0 +1,38 @@
+--- ./esc/src/app/xpcom/tray/Makefile.sdk.fix1	2009-04-17 13:39:58.000000000 -0700
++++ ./esc/src/app/xpcom/tray/Makefile.sdk	2009-04-17 14:18:17.000000000 -0700
+@@ -23,20 +23,20 @@
+ include $(CORE_DEPTH)/coreconf/rules.mk
+ 
+ ifeq ($(OS_ARCH),Linux)
+-CXXFLAGS        += $(MOZ_GTK_CFLAGS) $(MOZ_GTK2_CFLAGS) $(NOTIFY_CXX_FLAGS)
++CXXFLAGS        += $(MOZ_GTK_CFLAGS) $(MOZ_GTK2_CFLAGS) $(NOTIFY_CXX_FLAGS) -fPIC
+ endif
+ 
+ 
+ # Change this to point at your Gecko SDK directory.
+ ifndef GECKO_SDK_PATH
+-GECKO_SDK_PATH =/usr/lib/xulrunner-sdk-1.9pre/sdk
++GECKO_SDK_PATH =/usr/lib/xulrunner-sdk-1.9/sdk
+ endif
+ GECKO_SDK_INCLUDE_PATH=$(GECKO_SDK_PATH)/include
+ ifndef GECKO_INCLUDE_PATH
+-GECKO_INCLUDE_PATH=/usr/include/xulrunner-sdk-1.9pre
++GECKO_INCLUDE_PATH=/usr/include/xulrunner-sdk-1.9
+ endif
+ ifndef GECKO_BIN_PATH
+-GECKO_BIN_PATH=/usr/lib/xulrunner-1.9pre
++GECKO_BIN_PATH=/usr/lib/xulrunner-1.9
+ endif
+ 
+ ifeq ($(OS_ARCH),Darwin)
+@@ -148,6 +148,10 @@
+ 
+ endif
+ 
++ifeq ($(OS_ARCH),Linux)
++GECKO_LD_LIBS= -L$(GECKO_SDK_PATH)/lib $(GECKO_SDK_PATH)/lib/libxpcomglue_s.a
++endif
++
+  
+ # GCC only define which allows us to not have to #include mozilla-config 
+ # in every .cpp file.  If your not using GCC remove this line and add 

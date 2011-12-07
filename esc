@@ -1,0 +1,172 @@
+#!/bin/sh
+# 
+# BEGIN COPYRIGHT BLOCK
+# This Program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; version 2 of the License.
+#
+# This Program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this Program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place, Suite 330, Boston, MA 02111-1307 USA.
+#
+# Copyright (C) 2005 Red Hat, Inc.
+# All rights reserved.
+# END COPYRIGHT BLOCK
+
+
+DO_FORCEMODE="false"
+DO_SHOW_VERSION="false"
+ESC_ARGS=
+
+
+ESC_PROFILE_BASE=~/.redhat/esc
+ESC_LOG_FILE=esc.log
+
+ESC_PATH=$LIBDIR/esc-1.1.0
+ESC_BIN_PATH=/usr/bin
+ESC_EXEC=esc
+ESCD_EXEC=escd
+
+ESC_BIN=$ESC_PATH/xulrunner/xulrunner-bin
+ESCD_BIN=./$ESCD_EXEC
+
+LAST_PROG_PID=0
+SIGUSR1=10
+
+FORCE_START_ESC=
+
+XPTI_DAT=xpti.dat
+COMPREG_DAT=compreg.dat
+LOCK_FILE=lock
+PARENT_LOCK_FILE=.parentlock
+
+function isProgRunning {
+
+    userID=$(whoami)
+    isProgRunning=$(pgrep -U $userID -f $1)
+    if [ $isProgRunning  ];
+    then
+        LAST_PROG_PID=$isProgRunning
+        return 0
+    fi
+    LAST_PROG_PID=0
+    return 1 
+}
+
+function removeFile {
+
+    rm -f $1
+}
+
+function cleanupProfile {
+
+    removeFile $ESC_PROFILE_BASE/*default/$XPTI_DAT
+    removeFile $ESC_PROFILE_BASE/*default/$COMPREG_DAT
+    removeFile $ESC_PROFILE_BASE/*default/$LOCK_FILE
+    removeFile $ESC_PROFILE_BASE/*default/$PARENT_LOCK_FILE
+
+}
+
+function processArgs {
+
+    for arg in $1 
+    do
+
+        #echo "theArg: $arg"
+        if [ $arg == "forceStartESC" ]
+        then
+            #echo "Do force mode!"
+            FORCE_START_ESC="true"
+        fi
+
+        if [ $arg == "keyInserted" ]
+        then
+            FORCE_START_ESC="true"
+        fi
+
+        if [ $arg == "-version" ]
+        then
+            #echo "Do show version!"
+            DO_SHOW_VERSION="true"
+        fi
+    done
+}
+
+
+processArgs $*
+
+if [ ! -d $ESC_PROFILE_BASE ]
+then
+    mkdir -p  $ESC_PROFILE_BASE
+fi
+
+cd $ESC_PATH
+
+#First check if we just want the version
+
+if [ $DO_SHOW_VERSION == "true" ]
+    then
+    #echo "try to run the version command!"
+    ESC_ARGS="-version"
+    ./$ESC_EXEC $ESC_ARGS
+    exit 0
+fi
+
+# Start up the daemon if it is not running
+
+isProgRunning $ESCD_BIN
+
+if  [ $LAST_PROG_PID  -gt 0 ]
+then
+    false
+    #echo "escd already running."
+else
+    #echo "escd not running start."
+    cleanupProfile
+    ./$ESCD_EXEC --key_Inserted=\"/usr/bin/esc\"  --on_Signal=\"/usr/bin/esc\"
+    exit 0
+fi
+
+# Now check to see if we wer signaled from the daemon
+
+if [ $FORCE_START_ESC ]
+then
+    #echo "force start esc."
+
+    #Check to see if esc is already running
+
+    isProgRunning $ESC_BIN
+    if [  $LAST_PROG_PID  -gt 0 ]
+    then
+        #echo "attempting a force start but already running ... exit."
+        exit 0
+    fi
+    #echo "force start esc not running start esc..."
+    ./$ESC_EXEC
+    exit 0
+fi
+
+isProgRunning $ESC_BIN
+
+if [  $LAST_PROG_PID  -gt 0 ]
+then
+    #echo "esc already running."
+    ./$ESC_EXEC  
+    exit 0
+else
+    #echo "esc not already running start up and bring up window."
+    ./$ESC_EXEC & 
+    sleep 4
+    #echo "done sleeping bring up esc window."
+    ./$ESC_EXEC
+    exit 0
+fi
+
+exit 0
+
+
+

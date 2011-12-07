@@ -1,0 +1,54 @@
+diff -up ./esc/src/app/xul/esc/application.ini.fix9 ./esc/src/app/xul/esc/application.ini
+--- ./esc/src/app/xul/esc/application.ini.fix9	2010-03-02 14:57:39.060331553 -0800
++++ ./esc/src/app/xul/esc/application.ini	2010-03-02 14:57:54.064619321 -0800
+@@ -25,11 +25,11 @@ Vendor=RedHat
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-14
++Version=1.1.0-15
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.
+-BuildID=0000001014
++BuildID=0000001015
+ ;
+ ; This ID is just an example.  Every XUL app ought to have it's own unique ID.
+ ; You can use the microsoft "guidgen" or "uuidgen" tools, or go on
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/password.js.fix9 ./esc/src/app/xul/esc/chrome/content/esc/password.js
+--- ./esc/src/app/xul/esc/chrome/content/esc/password.js.fix9	2010-03-02 15:44:23.680410107 -0800
++++ ./esc/src/app/xul/esc/chrome/content/esc/password.js	2010-03-02 15:46:00.851822641 -0800
+@@ -42,6 +42,22 @@ function doOperation()
+    window.close(); 
+ }
+ 
++//
++// unregister our notify event
++//
++function cleanup()
++{
++    TrayRemoveWindow(null);
++    try {
++      netscape.security.PrivilegeManager.enablePrivilege("UniversalXPConnect");
++      netkey.rhCoolKeyUnSetNotifyCallback(gNotify);
++    } catch(e) {
++     MyAlert(getBundleString("errorUniversalXPConnect")  + e);
++    }
++
++}
++
++
+ 
+ function GetLocalPINValue()
+ {
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/password.xul.fix9 ./esc/src/app/xul/esc/chrome/content/esc/password.xul
+--- ./esc/src/app/xul/esc/chrome/content/esc/password.xul.fix9	2010-03-02 14:58:59.259862288 -0800
++++ ./esc/src/app/xul/esc/chrome/content/esc/password.xul	2010-03-02 15:50:44.532858213 -0800
+@@ -23,6 +23,7 @@
+     id="esc-window"
+     title="&getESCPassword;"
+     onload="PasswordLoad();"
++    onunload="cleanup();"
+     xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+ 
+ <stringbundle id="esc_strings" src="chrome://esc/locale/esc.properties"/>

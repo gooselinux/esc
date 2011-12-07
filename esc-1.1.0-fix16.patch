@@ -1,0 +1,106 @@
+diff -up ./esc/src/app/xul/esc/application.ini.fix16 ./esc/src/app/xul/esc/application.ini
+--- ./esc/src/app/xul/esc/application.ini.fix16	2010-04-27 11:44:55.974980663 -0700
++++ ./esc/src/app/xul/esc/application.ini	2010-04-27 11:44:35.531645489 -0700
+@@ -25,11 +25,11 @@ Vendor=RedHat
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-20
++Version=1.1.0-21
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.
+-BuildID=0000001020
++BuildID=0000001021
+ ;
+ ; This ID is just an example.  Every XUL app ought to have it's own unique ID.
+ ; You can use the microsoft "guidgen" or "uuidgen" tools, or go on
+diff -up ./esc/src/lib/coolkey/SmartCardMonitoringThread.cpp.fix16 ./esc/src/lib/coolkey/SmartCardMonitoringThread.cpp
+--- ./esc/src/lib/coolkey/SmartCardMonitoringThread.cpp.fix16	2010-04-27 11:38:15.137386002 -0700
++++ ./esc/src/lib/coolkey/SmartCardMonitoringThread.cpp	2010-04-27 11:42:54.987998126 -0700
+@@ -33,7 +33,7 @@
+ static PRLogModuleInfo *coolKeyLogSC = PR_NewLogModule("coolKeySmart");
+ 
+ SmartCardMonitoringThread::SmartCardMonitoringThread(SECMODModule *aModule)
+-  : mModule(aModule), mThread(NULL)
++  : mModule(aModule), mThread(NULL), mExitThread(NULL)
+ {
+     char tBuff[56];
+     PR_LOG( coolKeyLogSC, PR_LOG_DEBUG, 
+@@ -181,6 +181,9 @@ void SmartCardMonitoringThread::Execute(
+ 
+     } while (1);
+ 
++   PR_LOG( coolKeyLogSC, PR_LOG_DEBUG,
++             ("%s SmartCardMonitoringThread::Execute Leaving thread : \n",GetTStamp(tBuff,56)));
++
+ }
+ 
+ void SmartCardMonitoringThread::Interrupt()
+@@ -192,6 +195,13 @@ void SmartCardMonitoringThread::Interrup
+     if(mThread)
+     {
+         SECStatus rv;
++
++        if (!mExitThread) {
++            mExitThread = PR_CreateThread(PR_SYSTEM_THREAD, ExitTimeout, this,
++                              PR_PRIORITY_NORMAL, PR_GLOBAL_THREAD,
++                              PR_JOINABLE_THREAD, 0);
++        }
++
+         rv = SECMOD_CancelWait(mModule);
+         if (rv !=SECSuccess) {
+             PR_LOG( coolKeyLogSC, PR_LOG_DEBUG, 
+@@ -214,6 +224,12 @@ void SmartCardMonitoringThread::Interrup
+         mThread = 0; 
+     }
+ 
++    if(mExitThread)
++    {
++        PR_JoinThread(mExitThread);
++        mExitThread = NULL;
++    }
++
+     if(mModule)
+     {
+          PR_LOG( coolKeyLogSC, PR_LOG_DEBUG,
+@@ -252,3 +268,24 @@ void SmartCardMonitoringThread::LaunchEx
+ {
+     ((SmartCardMonitoringThread*)arg)->Execute();
+ }
++
++void SmartCardMonitoringThread::ExitTimeout(void *arg)
++{
++  char tBuff[56];
++  PR_LOG( coolKeyLogSC, PR_LOG_DEBUG,
++            ("%s SmartCardMonitoringThread::ExitTimeout : \n",GetTStamp(tBuff,56)));
++
++  PRUint32 wait_to_exit = 3;
++  PR_Sleep(PR_SecondsToInterval(wait_to_exit));
++
++  PR_LOG( coolKeyLogSC, PR_LOG_DEBUG,
++            ("%s SmartCardMonitoringThread::ExitTimeout : wait is done. \n",GetTStamp(tBuff,56)));
++
++  if(((SmartCardMonitoringThread*)arg)->mThread != NULL)  {
++
++     PR_LOG( coolKeyLogSC, PR_LOG_DEBUG,
++            ("%s SmartCardMonitoringThread::ExitTimeout : Timeout expired while SECMOD_Cancel is hanging, good-bye..! \n",GetTStamp(tBuff,56)));
++
++     exit(0);
++  }
++}
+diff -up ./esc/src/lib/coolkey/SmartCardMonitoringThread.h.fix16 ./esc/src/lib/coolkey/SmartCardMonitoringThread.h
+--- ./esc/src/lib/coolkey/SmartCardMonitoringThread.h.fix16	2010-04-27 11:38:25.748560991 -0700
++++ ./esc/src/lib/coolkey/SmartCardMonitoringThread.h	2010-04-27 11:42:59.862077864 -0700
+@@ -45,9 +45,11 @@ class SmartCardMonitoringThread
+   void Remove(CoolKeyInfo *info);
+ 
+   static void LaunchExecute(void *arg);
++  static void ExitTimeout(void *arg);
+   
+   SECMODModule *mModule;
+   PRThread* mThread;
++  PRThread* mExitThread;
+   char* mCurrentActivation;
+ };
+ 

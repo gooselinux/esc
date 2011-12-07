@@ -1,0 +1,22 @@
+--- ./esc/src/lib/coolkey/manifest.mn.fix4	2009-04-23 14:13:21.000000000 -0700
++++ ./esc/src/lib/coolkey/manifest.mn	2009-04-23 14:15:00.000000000 -0700
+@@ -27,7 +27,7 @@
+ ifndef MOZ_OFFSET
+ MOZ_OFFSET	= mozilla-1.7.13
+ endif
+-DEFINES		+= -I$(CORE_DEPTH)/esc/app/xpcom -I$(SYS_INC)/nspr4 -I$(SYS_INC)/nss3 -I$(SYS_INC)/PCSC  -I$(SYS_INC)/$(MOZ_OFFSET)/nspr -I$(SYS_INC)/$(MOZ_OFFSET)/nss -I$(XULRUNNER_BASE)/dist/public/nss -I$(XULRUNNER_BASE)/dist/include/nspr -I$(GECKO_SDK_PATH)/include/nspr -I$(GECKO_SDK_PATH)/include/nss
++DEFINES		+= -I$(CORE_DEPTH)/esc/app/xpcom -I$(SYS_INC)/nspr4 -I$(SYS_INC)/nss3 -I$(SYS_INC)/PCSC  -I$(SYS_INC)/$(MOZ_OFFSET)/nspr -I$(SYS_INC)/$(MOZ_OFFSET)/nss -I$(XULRUNNER_BASE)/dist/public/nss -I$(XULRUNNER_BASE)/dist/include/nspr -I$(GECKO_SDK_PATH)/include/nspr -I$(GECKO_SDK_PATH)/include/nss -fno-strict-aliasing
+ MAPFILE 	= $(OBJDIR)/ckymanager.def
+ 
+ #EXTRA_LIBS	+= -L$(DIST)/lib -lckyapplet
+--- ./esc/src/app/xul/esc/application.ini.fix4	2009-04-23 14:12:52.000000000 -0700
++++ ./esc/src/app/xul/esc/application.ini	2009-04-23 14:13:01.000000000 -0700
+@@ -25,7 +25,7 @@
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-5
++Version=1.1.0-6
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.

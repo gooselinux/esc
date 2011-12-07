@@ -1,0 +1,47 @@
+diff -up ./esc/src/app/xpcom/rhCoolKey.cpp.fix12 ./esc/src/app/xpcom/rhCoolKey.cpp
+--- ./esc/src/app/xpcom/rhCoolKey.cpp.fix12	2010-03-12 14:10:33.523852936 -0800
++++ ./esc/src/app/xpcom/rhCoolKey.cpp	2010-03-12 14:11:03.274347017 -0800
+@@ -30,7 +30,7 @@
+ #else
+ #include "nsServiceManagerUtils.h"
+ #endif
+-#include "pipnss/nsICertOverrideService.h"
++#include "nsICertOverrideService.h"
+ #include "nsIPrefBranch.h"
+ #include "nsIPrefService.h"
+ #include "nsCOMPtr.h"
+@@ -41,7 +41,7 @@
+ #include "prlink.h"
+ #include "prthread.h"
+ #include "nscore.h"
+-#include "content/nsCopySupport.h"
++#include "nsCopySupport.h"
+ #include <vector>
+ #include <string>
+ #include <time.h>
+diff -up ./esc/src/app/xpcom/tray/rhLinuxTray.cpp.fix12 ./esc/src/app/xpcom/tray/rhLinuxTray.cpp
+--- ./esc/src/app/xpcom/tray/rhLinuxTray.cpp.fix12	2010-03-12 14:11:38.588933568 -0800
++++ ./esc/src/app/xpcom/tray/rhLinuxTray.cpp	2010-03-12 14:11:47.083074485 -0800
+@@ -21,7 +21,7 @@
+ #include "nsIGenericFactory.h"
+ #include <prlog.h>
+ #include "notifytray.h"
+-#include "intl/nsIStringBundle.h"
++#include "nsIStringBundle.h"
+ #include <gdk/gdkx.h>
+ #include <stdlib.h>
+ 
+diff -up ./esc/src/app/xpcom/tray/rhTray.h.fix12 ./esc/src/app/xpcom/tray/rhTray.h
+--- ./esc/src/app/xpcom/tray/rhTray.h.fix12	2010-03-12 14:09:58.026263484 -0800
++++ ./esc/src/app/xpcom/tray/rhTray.h	2010-03-12 14:10:15.958561518 -0800
+@@ -23,8 +23,8 @@
+ #include "nsEmbedString.h"
+ #include <list>
+ #include "nsCOMPtr.h"
+-#include "widget/nsIBaseWindow.h"
+-#include "widget/nsIWidget.h"
++#include "nsIBaseWindow.h"
++#include "nsIWidget.h"
+ #include <time.h>
+ 
+ extern "C" {

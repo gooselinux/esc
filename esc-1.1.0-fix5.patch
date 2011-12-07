@@ -1,0 +1,218 @@
+--- ./esc/src/lib/coolkey/SmartCardMonitoringThread.cpp.fix5	2009-06-08 14:14:44.000000000 -0700
++++ ./esc/src/lib/coolkey/SmartCardMonitoringThread.cpp	2009-06-08 14:15:03.000000000 -0700
+@@ -159,7 +159,7 @@
+ 
+     /* if we think we have a token, but it's not the right one, or it's 
+      * not there, then send a removal event */
+-        if (info && (!isPresent || (info->mSeries != PK11_GetSlotSeries(slot))) ) {
++        if (info && !isPresent) {
+ 
+             PR_LOG( coolKeyLogSC, PR_LOG_DEBUG, 
+              ("%s SmartCardMonitoringThread::Execute Token Removed : \n",GetTStamp(tBuff,56)));
+--- ./esc/src/app/xul/esc/chrome/content/esc/certManager.xul.fix5	2009-06-08 13:46:19.000000000 -0700
++++ ./esc/src/app/xul/esc/chrome/content/esc/certManager.xul	2009-06-08 13:46:33.000000000 -0700
+@@ -59,7 +59,6 @@
+   <script type="application/x-javascript" src="chrome://global/content/strres.js"/>
+   <script type="application/x-javascript" src="chrome://pippki/content/pippki.js"/>
+   <script type="application/x-javascript" src="chrome://pippki/content/certManager.js"/>
+-  <script type="application/x-javascript" src="escCertManager.js"/>
+ 
+   <vbox flex="1">
+     <tabbox id="certmanagertabs" flex="1" style="margin:5px">
+--- ./esc/src/app/xul/esc/chrome/content/esc/password.xul.fix5	2009-06-08 14:04:16.000000000 -0700
++++ ./esc/src/app/xul/esc/chrome/content/esc/password.xul	2009-06-08 14:04:29.000000000 -0700
+@@ -23,7 +23,6 @@
+     id="esc-window"
+     title="&getESCPassword;"
+     onload="PasswordLoad();"
+-    onunload="cleanup();"
+     xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+ 
+ <stringbundle id="esc_strings" src="chrome://esc/locale/esc.properties"/>
+--- ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix5	2009-06-08 14:02:26.000000000 -0700
++++ ./esc/src/app/xul/esc/chrome/content/esc/ESC.js	2009-06-08 14:03:46.000000000 -0700
+@@ -522,7 +522,10 @@
+     if(!string_id || !gStringBundle)
+        return null;
+ 
+-    str = gStringBundle.getString(string_id);
++    try {
++        str = gStringBundle.getString(string_id);
++    } catch(e) {
++    }
+ 
+     return str;
+ }
+--- ./esc/src/app/xul/esc/application.ini.fix5	2009-06-08 13:44:59.000000000 -0700
++++ ./esc/src/app/xul/esc/application.ini	2009-06-08 13:45:15.000000000 -0700
+@@ -25,7 +25,7 @@
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-6
++Version=1.1.0-7
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.
+--- ./esc/win32/setup.iss.fix5	2009-06-08 14:16:04.000000000 -0700
++++ ./esc/win32/setup.iss	2009-06-08 14:16:26.000000000 -0700
+@@ -4,43 +4,31 @@
+ [Setup]
+ AppName=Smart Card Manager
+ AppMutex=ESCMutex
+-AppVerName=Smart Card Manager 1.1.0-3
+-AppPublisher=Red Hat, Inc.
++AppVerName=Smart Card Manager 1.1.0-6
++AppPublisher=Fedora
+ CreateAppDir=true
+ Compression=lzma
+ SolidCompression=true
+ MinVersion=0,5.0.2195
+ ShowLanguageDialog=yes
+-OutputBaseFilename=SmartCardManagerSetup-1.1.0-3.win32.i386
+-DefaultDirName={pf}\Red Hat\ESC
++OutputBaseFilename=SmartCardManagerSetup-1.1.0-6.win32.i386
++DefaultDirName={pf}\Fedora\ESC
+ DisableProgramGroupPage=false
+-DefaultGroupName=Red Hat
++DefaultGroupName=Fedora
+ SetupIconFile=BUILD\ESC\components\esc.ico
+ UninstallDisplayIcon={app}\components\esc.ico
+-WizardImageFile=BUILD\ESC\chrome\content\esc\esc-image-large.bmp
++;WizardImageFile=BUILD\ESC\chrome\content\esc\esc-image-large.bmp
++WizardImageFile=esc-image-large.bmp
+ WizardSmallImageFile=BUILD\ESC\components\esc.bmp
+ AllowNoIcons=yes
+ LicenseFile=esc-license.txt
+ InfoBeforeFile=info-before.txt
+ InfoAfterFile=info-after.txt
+ PrivilegesRequired=admin
+-VersionInfoVersion=1.1.0.3
++VersionInfoVersion=1.1.0.6
+ 
+ 
+ [Files]
+-Source: BUILD\egate\slbmgpg.dll; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egate.cat; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egate.inf; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egate.sys; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egate_License.txt; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egatebus.cat; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egatebus.inf; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egatebus.sys; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egaterdr.cat; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egaterdr.inf; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egaterdr.sys; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\egdrvins1.dll; DestDir: {win}\egate2.4; Flags: uninsneveruninstall
+-Source: BUILD\egate\eginstall.exe; DestDir: {win}\egate2.4; Flags: ignoreversion
+ Source: BUILD\clkcsp.dll; DestDir: {sys}; Flags: regserver restartreplace
+ Source: BUILD\cspres.dll; DestDir: {sys}; Flags: restartreplace
+ Source: BUILD\pk11install.exe; DestDir: {app}\PKCS11
+@@ -73,7 +61,6 @@
+ Source: BUILD\ESC\application.ini; DestDir: {app}
+ Source: BUILD\ESC\chrome\chrome.manifest; DestDir: {app}\chrome
+ Source: BUILD\ESC\chrome\content\esc\TRAY.js; DestDir: {app}\chrome\content\esc
+-Source: BUILD\ESC\chrome\content\esc\CertInfo.js; DestDir: {app}\chrome\content\esc
+ ;Source: BUILD\ESC\chrome\content\esc\certinfo.xul; DestDir: {app}\chrome\content\esc
+ Source: BUILD\ESC\chrome\content\esc\config.xul; DestDir: {app}\chrome\content\esc
+ Source: BUILD\ESC\chrome\content\esc\contents.rdf; DestDir: {app}\chrome\content\esc
+@@ -110,19 +97,18 @@
+ Source: BUILD\ESC\xulrunner\mozctl.dll; DestDir: {app}\xulrunner
+ Source: BUILD\ESC\xulrunner\mozctlx.dll; DestDir: {app}\xulrunner
+ Source: BUILD\ESC\xulrunner\nspr4.dll; DestDir: {app}\xulrunner
+-Source: BUILD\ESC\xulrunner\nspr4.dll; DestDir: {app}\PKCS11
++Source: BUILD\libnspr4.dll; DestDir: {app}\PKCS11
+ Source: BUILD\ESC\xulrunner\nss3.dll; DestDir: {app}\xulrunner
+-Source: BUILD\ESC\xulrunner\nss3.dll; DestDir: {app}\PKCS11
+ Source: BUILD\ESC\xulrunner\nssckbi.dll; DestDir: {app}\xulrunner
+ Source: BUILD\ESC\xulrunner\plc4.dll; DestDir: {app}\xulrunner
+-Source: BUILD\ESC\xulrunner\plc4.dll; DestDir: {app}\PKCS11
++Source: BUILD\libplc4.dll; DestDir: {app}\PKCS11
+ Source: BUILD\ESC\xulrunner\plds4.dll; DestDir: {app}\xulrunner
+-Source: BUILD\ESC\xulrunner\plds4.dll; DestDir: {app}\PKCS11
++Source: BUILD\libplds4.dll; DestDir: {app}\PKCS11
+ Source: BUILD\ESC\xulrunner\README.txt; DestDir: {app}\xulrunner
+ Source: BUILD\ESC\xulrunner\smime3.dll; DestDir: {app}\xulrunner
+ Source: BUILD\ESC\xulrunner\softokn3.chk; DestDir: {app}\xulrunner
+ Source: BUILD\ESC\xulrunner\softokn3.dll; DestDir: {app}\xulrunner
+-Source: BUILD\ESC\xulrunner\softokn3.dll; DestDir: {app}\PKCS11
++Source: BUILD\softokn3.dll; DestDir: {app}\PKCS11
+ Source: BUILD\ESC\xulrunner\ssl3.dll; DestDir: {app}\xulrunner
+ Source: BUILD\ESC\xulrunner\updater.exe; DestDir: {app}\xulrunner
+ Source: BUILD\ESC\xulrunner\xpcom.dll; DestDir: {app}\xulrunner
+@@ -413,9 +399,6 @@
+ Source: BUILD\ESC\xulrunner\res\fonts\mathfontSTIXSize1.properties; DestDir: {app}\xulrunner\res\fonts
+ Source: BUILD\ESC\xulrunner\res\html\folder.png; DestDir: {app}\xulrunner\res\html
+ Source: BUILD\ESC\xulrunner\defaults\profile\localstore.rdf; DestDir: {app}\xulrunner\defaults\profile
+-Source: BUILD\ESC\xulrunner\sqlite3.dll; DestDir: {app}\PKCS11
+-Source: BUILD\ESC\xulrunner\mozcrt19.dll; DestDir: {app}\PKCS11
+-Source: BUILD\ESC\xulrunner\nssutil3.dll; DestDir: {app}\PKCS11
+ Source: BUILD\ESC\xulrunner\dictionaries\en-US.aff; DestDir: {app}\dictionaries
+ Source: BUILD\ESC\xulrunner\dictionaries\en-US.dic; DestDir: {app}\dictionaries
+ Source: BUILD\ESC\xulrunner\modules\XPCOMUtils.jsm; DestDir: {app}\modules
+@@ -429,7 +412,6 @@
+ 
+ [Run]
+ 
+-Filename: {win}\egate2.4\eginstall.exe; Parameters: -f -l eginstall.txt; WorkingDir: {win}\egate2.4; Flags: waituntilterminated; StatusMsg: Installing smart card drivers....
+ Filename: {app}\PKCS11\pk11install.exe; Parameters: "-v ""name='CoolKey Module' library=coolkeypk11.dll NSS=""slotParams={{0x1=[slotFlags=PublicCerts]}"""""; WorkingDir: {sys}; StatusMsg: Configuring System for smart cards...
+ Filename: {app}\xulrunner\xulrunner.exe; Parameters: """--register-global"""
+ Filename: {app}\esc.exe; WorkingDir: {app}; StatusMsg: {code:GetEscStatusMsg}; Flags: nowait
+@@ -450,12 +432,18 @@
+ Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Axalto Developer; ValueType: binary; ValueName: ATR; ValueData: 3b 75 94 00 00 62 02 02 00 00
+ 
+ ; Now register the Gemalto 64K V2
+-Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Gemalto 64K V2; ValueType: binary; ValueName: ATRMask: ValueData: ff ff ff ff ff ff ff ff ff ff; Flags: uninsdeletekey
++Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Gemalto 64K V2; ValueType: binary; ValueName: ATRMask; ValueData: ff ff 00 ff 00 ff ff ff 00 00; Flags: uninsdeletekey
+ 
+-Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Gemalto 64 V2: ValueType: string; ValueName: Crypto Provider; ValueData: CoolKey PKCS #11 CSP
++Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Gemalto 64K V2; ValueType: string; ValueName: Crypto Provider; ValueData: CoolKey PKCS #11 CSP
+ 
+-Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Gemalto 64 V2: ValueType: binary; ValueName: ATR; ValueData: 3b 95 95 40 ff ae 01 03 00 00
++Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Gemalto 64K V2; ValueType: binary; ValueName: ATR; ValueData: 3b 95 00 40 00 ae 01 03 00 00
+ 
++; Now register the Safenet 330J
++Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Safenet 330J; ValueType: binary; ValueName: ATRMask; ValueData: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff 00 00; Flags: uninsdeletekey
++
++Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Safenet 330J; ValueType: string; ValueName: Crypto Provider; ValueData: CoolKey PKCS #11 CSP
++
++Root: HKLM; Subkey: Software\Microsoft\Cryptography\Calais\SmartCards\Safenet 330J; ValueType: binary; ValueName: ATR; ValueData: 3b ec 00 ff 81 31 fe 45 a0 00 00 00 56 33 33 30 4a 33 06 00 00
+ 
+ Root: HKLM; Subkey: Software\
+ ; Turn off the "pick a cert" dialog box
+--- ./esc/win32/build.sh.fix5	2009-06-08 14:15:58.000000000 -0700
++++ ./esc/win32/build.sh	2009-06-08 14:16:33.000000000 -0700
+@@ -37,6 +37,8 @@
+ NSS_ARCHIVE=$NSS_NAME-with-nspr-4.6.4
+ NSS_SOURCE_URL=https://ftp.mozilla.org/pub/mozilla.org/security/nss/releases/NSS_3_11_4_RTM/src/$NSS_ARCHIVE.tar.gz
+ 
++NSS_LIB_PATH=$NSS_NAME/mozilla/dist/WIN*/lib
++
+ #Inno installer values
+ 
+ #INNO_PATH="C:/Program Files/Inno Setup 5/ISCC.exe"
+@@ -76,7 +78,7 @@
+ #ESC values
+ 
+ ESC_NAME=esc
+-ESC_VERSION_NO=1.1.0-3
++ESC_VERSION_NO=1.1.0-6
+ 
+ 
+ #Cygwin values
+@@ -462,6 +464,15 @@
+ 
+     cp esc-image-large.bmp BUILD/ESC/chrome/content/esc
+ 
++
++     #Transport the nss files needed for pk11install.exe
++
++    cp $NSS_LIB_PATH/softokn3.dll BUILD
++    cp $NSS_LIB_PATH/libplc4.dll BUILD
++    cp $NSS_LIB_PATH/libnspr4.dll BUILD
++    cp $NSS_LIB_PATH/libplds4.dll BUILD
++
++
+     # Build the INNO executable installer
+ 
+     "$INNO_PATH" setup.iss

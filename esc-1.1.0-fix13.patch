@@ -1,0 +1,29 @@
+diff -up ./esc/src/app/xul/esc/application.ini.fix13 ./esc/src/app/xul/esc/application.ini
+--- ./esc/src/app/xul/esc/application.ini.fix13	2010-03-30 11:46:27.256634781 -0700
++++ ./esc/src/app/xul/esc/application.ini	2010-03-30 11:46:37.238782689 -0700
+@@ -25,11 +25,11 @@ Vendor=RedHat
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-17
++Version=1.1.0-18
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.
+-BuildID=0000001017
++BuildID=0000001018
+ ;
+ ; This ID is just an example.  Every XUL app ought to have it's own unique ID.
+ ; You can use the microsoft "guidgen" or "uuidgen" tools, or go on
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix13 ./esc/src/app/xul/esc/chrome/content/esc/ESC.js
+--- ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix13	2010-03-30 11:47:05.869207316 -0700
++++ ./esc/src/app/xul/esc/chrome/content/esc/ESC.js	2010-03-30 11:47:34.344515684 -0700
+@@ -1862,6 +1862,8 @@ function InitializeAdminBindingList()
+  
+  window.setTimeout('ShowWindow()',250);
+ 
++ list.focus();
++
+ }
+ 
+ //Window related functions

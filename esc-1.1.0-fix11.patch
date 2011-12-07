@@ -1,0 +1,60 @@
+diff -up ./esc/src/app/xul/esc/application.ini.fix11 ./esc/src/app/xul/esc/application.ini
+--- ./esc/src/app/xul/esc/application.ini.fix11	2010-03-11 14:01:45.977432197 -0800
++++ ./esc/src/app/xul/esc/application.ini	2010-03-11 14:01:59.034655936 -0800
+@@ -25,11 +25,11 @@ Vendor=RedHat
+ Name=ESC
+ ;
+ ; This field specifies your application's version.  This field is optional.
+-Version=1.1.0-16
++Version=1.1.0-17
+ ;
+ ; This field specifies your application's build ID (timestamp).  This field is
+ ; required.
+-BuildID=0000001016
++BuildID=0000001017
+ ;
+ ; This ID is just an example.  Every XUL app ought to have it's own unique ID.
+ ; You can use the microsoft "guidgen" or "uuidgen" tools, or go on
+diff -up ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix11 ./esc/src/app/xul/esc/chrome/content/esc/ESC.js
+--- ./esc/src/app/xul/esc/chrome/content/esc/ESC.js.fix11	2010-03-11 14:05:11.831909294 -0800
++++ ./esc/src/app/xul/esc/chrome/content/esc/ESC.js	2010-03-11 18:43:46.501919175 -0800
+@@ -1810,11 +1810,12 @@ function AdminKeyPressHandler(evt)
+   {
+       return;
+   }
++  list.selectItem(gCurrentSelectedRow);
+   selectedIndex = list.selectedIndex;
+ 
+   if(selectedIndex == -1)
+   {
+-    olditem = list.getItemAtIndex(0);    
++    olditem = list.getItemAtIndex(0);
+     if(olditem) {
+       list.selectItem(olditem);
+       olditem.click();
+@@ -1825,7 +1826,7 @@ function AdminKeyPressHandler(evt)
+ 
+   if(evt.keyCode == KeyEvent.DOM_VK_UP) {
+    offset = -1;
+-  } 
++  }
+   if(evt.keyCode == KeyEvent.DOM_VK_DOWN) {
+     offset = 1;
+   }
+@@ -1837,7 +1838,7 @@ function AdminKeyPressHandler(evt)
+       list.moveByOffset( offset , 1, 0);
+       newitem = list.getItemAtIndex(list.selectedIndex);
+       olditem.blur();
+-      if(newitem)
++      if(newitem) 
+         newitem.click();
+   }
+ }
+@@ -2396,6 +2397,7 @@ function UpdateAdminKeyDetailsArea(keyTy
+            {
+                DisableItem(menu_format);
+                DisableItem(menu_resetpassword);
++               DisableItem(menu_enroll);
+            }
+        }
+ 
